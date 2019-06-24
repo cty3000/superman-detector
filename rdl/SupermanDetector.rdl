@@ -1,0 +1,8 @@
+//
+// A SupermanDetector API in *RDL*
+//
+name SupermanDetector;
+version 1;
+namespace LexCorp;
+
+include "SupermanDetector.rdli";

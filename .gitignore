@@ -1,0 +1,13 @@
+*~
+keys/
+certs/
+.project
+.settings
+META-INF
+build.properties
+.DS_Store
+ipaccess.db
+go.mod
+go.sum
+vendor
+superman-detector

@@ -1,0 +1,11 @@
+include "SupermanDetector.tdl";
+
+resource IpAccessResponse POST "/" (name=postIpAccessRequest) {
+    IpAccessRequest request;
+    expected OK;
+    exceptions {
+        ResourceError BAD_REQUEST;
+        ResourceError NOT_FOUND;
+    }
+}
+

@@ -1,0 +1,429 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">superman-detector/api.go (84.4%)</option>
+				
+				<option value="file1">superman-detector/main.go (0.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">no coverage</span>
+				<span class="cov1">low coverage</span>
+				<span class="cov2">*</span>
+				<span class="cov3">*</span>
+				<span class="cov4">*</span>
+				<span class="cov5">*</span>
+				<span class="cov6">*</span>
+				<span class="cov7">*</span>
+				<span class="cov8">*</span>
+				<span class="cov9">*</span>
+				<span class="cov10">high coverage</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package main
+
+import (
+        "database/sql"
+        "fmt"
+        "log"
+        "net"
+        "os"
+        "strconv"
+
+        "github.com/ardielle/ardielle-go/rdl"
+        "gitlab.com/cty3000/superman-detector/supermandetector"
+
+        _ "github.com/mattn/go-sqlite3"
+        "github.com/oschwald/geoip2-golang"
+        "github.com/umahmood/haversine"
+)
+
+type SupermanDetectorImpl struct {
+        baseUrl        string
+        ipaccessdb     *sql.DB
+        geodb          *geoip2.Reader
+        speedThreshold int32
+}
+
+// NewSupermanDetectorImpl is an implementation to initialize a SupermanDetectorImpl
+func NewSupermanDetectorImpl(baseUrl string) (*SupermanDetectorImpl, error) <span class="cov8" title="11">{
+        var err error
+
+        impl := new(SupermanDetectorImpl)
+        impl.geodb, err = impl.InitGeoDB()
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="11">impl.ipaccessdb, err = impl.InitIPAccessDB()
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="11">impl.baseUrl = baseUrl
+        impl.speedThreshold = 500
+
+        return impl, nil</span>
+}
+
+// InitGeoDB is an implementation to make a connection with GeoLite2 City database
+func (impl *SupermanDetectorImpl) InitGeoDB() (*geoip2.Reader, error) <span class="cov8" title="11">{
+        db, err := geoip2.Open("GeoLite2-City.mmdb")
+        if err != nil </span><span class="cov0" title="0">{
+                defer db.Close()
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="11">return db, nil</span>
+}
+
+// InitIPAccessDB is an implementation to initialize sqlite database for ip access record
+func (impl *SupermanDetectorImpl) InitIPAccessDB() (*sql.DB, error) <span class="cov8" title="11">{
+        os.Remove("./ipaccess.db")
+
+        db, err := sql.Open("sqlite3", "./ipaccess.db")
+        if err != nil </span><span class="cov0" title="0">{
+                defer db.Close()
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="11">sqlStmt := `
+        create table ipaccess (username text not null, unix_timestamp integer not null, event_uuid text not null primary key, ip_address text not null, lat real not null, lon real not null, radius not null);
+        delete from ipaccess;
+        `
+        _, err = db.Exec(sqlStmt)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Printf("%q: %s\n", err, sqlStmt)
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="11">return db, nil</span>
+}
+
+// IpAccessRequest2CurrentGeo is an implementation to obtain a current geolocation from the request information
+func (impl *SupermanDetectorImpl) IpAccessRequest2CurrentGeo(request *supermandetector.IpAccessRequest) (*supermandetector.CurrentGeo, error) <span class="cov6" title="5">{
+        // If you are using strings that may be invalid, check that ip is not nil
+        ip := net.ParseIP(string(request.Ip_address))
+        city, err := impl.geodb.City(ip)
+        if err != nil </span><span class="cov3" title="2">{
+                return nil, err
+        }</span>
+
+        <span class="cov4" title="3">return supermandetector.NewCurrentGeo(&amp;supermandetector.CurrentGeo{
+                Lat:    float64(city.Location.Latitude),
+                Lon:    float64(city.Location.Longitude),
+                Radius: int32(city.Location.AccuracyRadius),
+        }), nil</span>
+}
+
+// GenerateIpAccessRecord is an implementation to generate a registerable struct as IpAccessRecord from the current geolocation and the request information
+func (impl *SupermanDetectorImpl) GenerateIpAccessRecord(request *supermandetector.IpAccessRequest, currentGeo *supermandetector.CurrentGeo) *supermandetector.IpAccessRecord <span class="cov4" title="3">{
+        return supermandetector.NewIpAccessRecord(&amp;supermandetector.IpAccessRecord{
+                Username:       request.Username,
+                Unix_timestamp: request.Unix_timestamp,
+                Event_uuid:     request.Event_uuid,
+                Ip_address:     request.Ip_address,
+                Lat:            currentGeo.Lat,
+                Lon:            currentGeo.Lon,
+                Radius:         currentGeo.Radius,
+        })
+}</span>
+
+// RegisterIpAccessRecord is an implementation to register ip access to database as a record
+func (impl *SupermanDetectorImpl) RegisterIpAccessRecord(ipRecord *supermandetector.IpAccessRecord) error <span class="cov10" title="16">{
+        tx, err := impl.ipaccessdb.Begin()
+        if err != nil </span><span class="cov4" title="3">{
+                return err
+        }</span>
+
+        <span class="cov9" title="13">stmt, err := tx.Prepare("insert into ipaccess(username, unix_timestamp, event_uuid, ip_address, lat, lon, radius) values(?, ?, ?, ?, ?, ?, ?)")
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov9" title="13">defer stmt.Close()
+
+        _, err = stmt.Exec(ipRecord.Username, ipRecord.Unix_timestamp, ipRecord.Event_uuid, ipRecord.Ip_address, ipRecord.Lat, ipRecord.Lon, ipRecord.Radius)
+        if err != nil </span><span class="cov3" title="2">{
+                tx.Rollback()
+                return err
+        }</span>
+        <span class="cov8" title="11">tx.Commit()
+
+        return nil</span>
+}
+
+// GetSubsequentIpAccess is an implementation to get a nearest preceding ip access from current ip access
+func (impl *SupermanDetectorImpl) GetPrecedingIpAccess(ipRecord *supermandetector.IpAccessRecord) (*supermandetector.IpAccess, error) <span class="cov4" title="3">{
+        stmt, err := impl.ipaccessdb.Prepare("select ip_address, lat, lon, radius, unix_timestamp from ipaccess where unix_timestamp &lt; ? order by unix_timestamp limit 1")
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov4" title="3">defer stmt.Close()
+
+        var ip_address, lat, lon, radius, unix_timestamp string
+        err = stmt.QueryRow(ipRecord.Unix_timestamp).Scan(&amp;ip_address, &amp;lat, &amp;lon, &amp;radius, &amp;unix_timestamp)
+        if err == sql.ErrNoRows </span><span class="cov1" title="1">{
+                log.Printf("No PrecedingIpAccess\n")
+                return nil, nil
+        }</span> else<span class="cov3" title="2"> if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov3" title="2">destination := haversine.Coord{Lat: float64(ipRecord.Lat), Lon: float64(ipRecord.Lon)}
+        originLat, _ := strconv.ParseFloat(lat, 64)
+        originLon, _ := strconv.ParseFloat(lon, 64)
+        originRadius, _ := strconv.Atoi(radius)
+        originUnixTimestamp, _ := strconv.Atoi(unix_timestamp)
+        origin := haversine.Coord{Lat: originLat, Lon: originLon}
+        originTime, _ := strconv.Atoi(unix_timestamp)
+        time := (int(ipRecord.Unix_timestamp) - originTime) / 3600
+        speed := impl.CalculateSpeed(origin, destination, time)
+
+        return supermandetector.NewIpAccess(&amp;supermandetector.IpAccess{
+                Ip:        supermandetector.IPAddress(ip_address),
+                Speed:     int32(speed),
+                Lat:       originLat,
+                Lon:       originLon,
+                Radius:    int32(originRadius),
+                Timestamp: int32(originUnixTimestamp),
+        }), nil</span>
+}
+
+// GetSubsequentIpAccess is an implementation to get a nearest subsequent ip access from current ip access
+func (impl *SupermanDetectorImpl) GetSubsequentIpAccess(ipRecord *supermandetector.IpAccessRecord) (*supermandetector.IpAccess, error) <span class="cov4" title="3">{
+        stmt, err := impl.ipaccessdb.Prepare("select ip_address, lat, lon, radius, unix_timestamp from ipaccess where unix_timestamp &gt; ? order by unix_timestamp limit 1")
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov4" title="3">defer stmt.Close()
+
+        var ip_address, lat, lon, radius, unix_timestamp string
+        err = stmt.QueryRow(ipRecord.Unix_timestamp).Scan(&amp;ip_address, &amp;lat, &amp;lon, &amp;radius, &amp;unix_timestamp)
+        if err == sql.ErrNoRows </span><span class="cov1" title="1">{
+                log.Printf("No SubsequentIpAccess\n")
+                return nil, nil
+        }</span> else<span class="cov3" title="2"> if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov3" title="2">origin := haversine.Coord{Lat: float64(ipRecord.Lat), Lon: float64(ipRecord.Lon)}
+        destinationLat, _ := strconv.ParseFloat(lat, 64)
+        destinationLon, _ := strconv.ParseFloat(lon, 64)
+        destinationRadius, _ := strconv.Atoi(radius)
+        destinationUnixTimestamp, _ := strconv.Atoi(unix_timestamp)
+        destination := haversine.Coord{Lat: destinationLat, Lon: destinationLon}
+        destinationTime, _ := strconv.Atoi(unix_timestamp)
+        time := (destinationTime - int(ipRecord.Unix_timestamp)) / 3600
+        speed := impl.CalculateSpeed(origin, destination, time)
+
+        return supermandetector.NewIpAccess(&amp;supermandetector.IpAccess{
+                Ip:        supermandetector.IPAddress(ip_address),
+                Speed:     int32(speed),
+                Lat:       destinationLat,
+                Lon:       destinationLon,
+                Radius:    int32(destinationRadius),
+                Timestamp: int32(destinationUnixTimestamp),
+        }), nil</span>
+}
+
+// CalculateSpeed is an implementation to calculate speed from the latitude and longitude of origin and destination with the time
+func (impl *SupermanDetectorImpl) CalculateSpeed(origin haversine.Coord, destination haversine.Coord, time int) int <span class="cov5" title="4">{
+        mi, _ := haversine.Distance(origin, destination)
+        return int(mi / float64(time))
+}</span>
+
+// PostIpAccessRequest is an implementation for the api logic
+func (impl *SupermanDetectorImpl) PostIpAccessRequest(context *rdl.ResourceContext, request *supermandetector.IpAccessRequest) (*supermandetector.IpAccessResponse, error) <span class="cov5" title="4">{
+
+        response := supermandetector.NewIpAccessResponse()
+
+        currentGeo, err := impl.IpAccessRequest2CurrentGeo(request)
+        if err != nil </span><span class="cov3" title="2">{
+                errMsg := fmt.Sprintf("Failed to get city from ip, Error:%v", err)
+                log.Printf(string(errMsg))
+                return nil, &amp;rdl.ResourceError{Code: 200, Message: errMsg}
+        }</span>
+        <span class="cov3" title="2">response.CurrentGeo = currentGeo
+
+        record := impl.GenerateIpAccessRecord(request, response.CurrentGeo)
+        err = impl.RegisterIpAccessRecord(record)
+        if err != nil </span><span class="cov1" title="1">{
+                errMsg := fmt.Sprintf("Failed to register IpAccessRecord, Error:%v", err)
+                log.Printf(string(errMsg))
+                return nil, &amp;rdl.ResourceError{Code: 200, Message: errMsg}
+        }</span>
+
+        <span class="cov1" title="1">response.PrecedingIpAccess, err = impl.GetPrecedingIpAccess(record)
+        if err != nil </span><span class="cov0" title="0">{
+                errMsg := fmt.Sprintf("Failed get PrecedingIpAccess, Error:%v", err)
+                return nil, &amp;rdl.ResourceError{Code: 200, Message: errMsg}
+        }</span>
+        <span class="cov1" title="1">if response.PrecedingIpAccess != nil </span><span class="cov1" title="1">{
+                response.TravelToCurrentGeoSuspicious = new(bool)
+                *response.TravelToCurrentGeoSuspicious = (response.PrecedingIpAccess.Speed &gt; impl.speedThreshold)
+                log.Printf("PrecedingIpAccess: %v\n", *response.PrecedingIpAccess)
+        }</span>
+
+        <span class="cov1" title="1">response.SubsequentIpAccess, err = impl.GetSubsequentIpAccess(record)
+        if err != nil </span><span class="cov0" title="0">{
+                errMsg := fmt.Sprintf("Failed get SubsequentIpAccess, Error:%v", err)
+                return nil, &amp;rdl.ResourceError{Code: 200, Message: errMsg}
+        }</span>
+        <span class="cov1" title="1">if response.SubsequentIpAccess != nil </span><span class="cov1" title="1">{
+                response.TravelFromCurrentGeoSuspicious = new(bool)
+                *response.TravelFromCurrentGeoSuspicious = (response.SubsequentIpAccess.Speed &gt; impl.speedThreshold)
+                log.Printf("SubsequentIpAccess: %v\n", *response.SubsequentIpAccess)
+        }</span>
+
+        <span class="cov1" title="1">return response, nil</span>
+}
+
+//
+// the following is to support TLS-based authentication, and self-authorization that just logs what if *could* enforce.
+//
+
+func (impl *SupermanDetectorImpl) Authorize(action string, resource string, principal rdl.Principal) (bool, error) <span class="cov0" title="0">{
+        return true, nil
+}</span>
+
+func (impl *SupermanDetectorImpl) Authenticate(context *rdl.ResourceContext) bool <span class="cov0" title="0">{
+        return false
+}</span>
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package main
+
+import (
+        "net/http"
+        "os"
+
+        "gitlab.com/cty3000/superman-detector/supermandetector"
+)
+
+func getPort() string <span class="cov0" title="0">{
+        p := os.Getenv("PORT")
+        if p != "" </span><span class="cov0" title="0">{
+                return p
+        }</span>
+
+        <span class="cov0" title="0">return "80"</span>
+}
+
+func getEndPoint() string <span class="cov0" title="0">{
+        h := os.Getenv("HOST")
+        if h != "" </span><span class="cov0" title="0">{
+                return h + ":" + getPort()
+        }</span>
+
+        <span class="cov0" title="0">return "0.0.0.0:" + getPort()</span>
+}
+
+func getUrl() string <span class="cov0" title="0">{
+        p := os.Getenv("PROTOCOL")
+        if p != "" </span><span class="cov0" title="0">{
+                return p + "://" + getEndPoint() + "/"
+        }</span>
+
+        <span class="cov0" title="0">return "http://" + getEndPoint() + "/"</span>
+}
+
+func main() <span class="cov0" title="0">{
+        url := getUrl()
+
+        impl, err := NewSupermanDetectorImpl(url)
+        if err != nil </span><span class="cov0" title="0">{
+                panic(err)</span>
+        }
+
+        <span class="cov0" title="0">http.Handle("/", supermandetector.Init(impl, url, impl))</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
